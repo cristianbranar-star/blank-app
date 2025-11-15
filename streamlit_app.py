@@ -1,210 +1,184 @@
 import streamlit as st
 import pandas as pd
+import plotly.express as px
 import numpy as np
-import tensorflow as tf
-import joblib
-from tensorflow.keras.models import load_model
-import matplotlib.pyplot as plt  # <-- Importe agregado
-import seaborn as sns            # <-- Importe agregado
 
 # --- Configuración de la Página ---
 st.set_page_config(
-    page_title="Predicciones Metrosalud",
-    page_icon="🏥",
+    page_title="Constructor de Dashboards",
+    page_icon="🚀",
     layout="wide"
 )
 
-# --- Título y Descripción ---
-st.title("🏥 Proyecto Metrosalud - Primera Infancia")
-st.markdown("""
-Esta aplicación utiliza un modelo de Red Neuronal (IA) entrenado para 
-predecir... *(Aquí debes completar el objetivo de tu modelo, ej: 'el riesgo de desnutrición', 'el estado de vacunación', etc.)*
-""")
+# --- Estado de Sesión ---
+# Usamos session_state para almacenar el DataFrame cargado
+if 'df' not in st.session_state:
+    st.session_state.df = None
+if 'df_name' not in st.session_state:
+    st.session_state.df_name = ""
 
-# --- Carga de Modelos y Pre-procesadores ---
-# Usamos @st.cache_resource para cargar los modelos solo una vez
-
-@st.cache_resource
-def cargar_modelo():
-    """Carga el modelo de Keras y los pre-procesadores."""
-    try:
-        modelo = load_model('modelo_primera_infancia.h5')
-        scaler = joblib.load('scaler_X.pkl')
-        encoder = joblib.load('encoder_y.pkl')
-        return modelo, scaler, encoder
-    except FileNotFoundError:
-        st.error("Error Crítico: Faltan los archivos del modelo ('modelo_primera_infancia.h5' o 'scaler_X.pkl').")
-        st.error("Asegúrate de haber subido los archivos .h5 y .pkl a tu repositorio de GitHub.")
-        return None, None, None
-    except Exception as e:
-        st.error(f"Error al cargar los modelos: {e}")
-        return None, None, None
-
-modelo, scaler, encoder = cargar_modelo()
-
-# --- Barra Lateral de Interacción (Inputs del Usuario) ---
-st.sidebar.header("Ingresar Datos del Paciente")
-
-if modelo is None:
-    st.sidebar.error("La app no puede funcionar sin los archivos del modelo.")
-else:
-    # --- Formulario de Inputs ---
-    # !!! IMPORTANTE: REEMPLAZA ESTO CON TUS VERDADERAS CARACTERÍSTICAS (FEATURES) !!!
-    # El orden y tipo de dato debe ser EXACTAMENTE el mismo que usaste para entrenar.
-    
-    st.sidebar.write("Debes reemplazar estos campos de ejemplo:")
-    
-    # Ejemplo Característica 1 (Numérica)
-    edad_meses = st.sidebar.slider("Edad (meses)", min_value=0, max_value=60, value=24, help="Edad del infante en meses.")
-    
-    # Ejemplo Característica 2 (Numérica)
-    peso_kg = st.sidebar.number_input("Peso (kg)", min_value=1.0, max_value=25.0, value=10.0, step=0.1)
-    
-    # Ejemplo Característica 3 (Categórica)
-    vacunas = st.sidebar.selectbox("Esquema de Vacunación", ['Completo', 'Incompleto', 'No Aplica'])
-    
-    # Ejemplo Característica 4 (Numérica)
-    talla_cm = st.sidebar.number_input("Talla (cm)", min_value=40.0, max_value=120.0, value=75.0)
-    
-    # Botón para predecir
-    submit_button = st.sidebar.button("Realizar Predicción", type="primary")
-
-# --- Lógica de Predicción ---
-if submit_button and modelo is not None:
-    st.header("Resultado de la Predicción", divider='rainbow')
-    
-    try:
-        # 1. Crear el DataFrame de entrada para el pre-procesamiento
-        # Debe tener los MISMOS NOMBRES DE COLUMNAS que tu X_train original
-        
-        # !!! REEMPLAZA ESTO !!!
-        # Crea un diccionario con los nombres de columna correctos
-        input_data_dict = {
-            'col_edad': [edad_meses],
-            'col_peso': [peso_kg],
-            'col_vacunas': [vacunas],
-            'col_talla': [talla_cm]
-            # ... añade todas tus columnas ...
-        }
-        
-        input_df = pd.DataFrame(input_data_dict)
-        st.write("Datos de entrada (pre-procesamiento):")
-        st.dataframe(input_df)
-
-        # 2. Pre-procesar los datos
-        # Esta es la razón por la que DEBES guardar tu scaler.
-        # Asumiendo que usaste un ColumnTransformer o un pipeline.
-        # Si escalaste todo, sería algo como:
-        
-        # --- (INICIO) Ejemplo de Pre-procesamiento ---
-        # Esto es muy específico de tu notebook, debes adaptarlo.
-        # Supongamos que 'col_edad', 'col_peso', 'col_talla' eran numéricas
-        # y 'col_vacunas' era categórica.
-        
-        # Separar columnas numéricas y categóricas (ejemplo)
-        # Esto es solo un EJEMPLO. Debes usar tu lógica de scaler/encoder
-        
-        # Aplicar el scaler a los datos numéricos de entrada
-        # Asumiendo que el scaler se ajustó a ['col_edad', 'col_peso', 'col_talla']
-        # datos_numericos = input_df[['col_edad', 'col_peso', 'col_talla']]
-        # datos_numericos_scaled = scaler.transform(datos_numericos)
-        
-        # Aplicar el encoder a los datos categóricos de entrada
-        # (Si usaste One-Hot, es más complejo y es mejor usar un Pipeline)
-        # (Por simplicidad, asumiremos que tu scaler los procesa todos o que
-        # tu modelo puede manejar diferentes tipos, lo cual es raro)
-        
-        # *** Simulación de escalado simple ***
-        # Es más probable que tu scaler espere un array de todas las features
-        # en un orden específico.
-        
-        # Ejemplo:
-        # 1. Convertir 'vacunas' a número (ej. LabelEncoding manual)
-        # input_df['col_vacunas'] = input_df['col_vacunas'].map({'Completo': 2, 'Incompleto': 1, 'No Aplica': 0})
-        
-        # 2. Crear el array de numpy en el orden correcto
-        # features_para_scaler = input_df[['col_edad', 'col_peso', 'col_talla', 'col_vacunas']].values
-        
-        # 3. Aplicar scaler
-        # features_scaled = scaler.transform(features_para_scaler)
-        
-        # --- (FIN) Ejemplo de Pre-procesamiento ---
-
-        # DADO QUE NO PUEDO SABER TU PRE-PROCESAMIENTO, USARÉ UN SIMULADOR
-        # ¡¡¡ DEBES REEMPLAZAR ESTA LÍNEA !!!
-        features_scaled = np.random.rand(1, modelo.input_shape[1])
-        st.warning("Advertencia: Usando datos de predicción simulados. Debes conectar tu lógica de pre-procesamiento (scaler/encoder) aquí.")
-        
-
-        # 3. Realizar la predicción
-        prediccion_prob = modelo.predict(features_scaled)
-        
-        # 4. Interpretar el resultado
-        # Si es clasificación multiclase (softmax), obtén la clase con mayor prob.
-        clase_predicha_idx = np.argmax(prediccion_prob, axis=1)[0]
-        
-        # Usar el encoder de 'y' para obtener la etiqueta original
-        # Asumiendo que 'encoder' es el encoder de 'y' (la variable objetivo)
-        etiqueta_predicha = encoder.categories_[0][clase_predicha_idx]
-
-        st.success(f"**Predicción del Modelo:** {etiqueta_predicha}")
-        
-        st.write("Probabilidades (debug):")
-        st.dataframe(pd.DataFrame(prediccion_prob, columns=encoder.categories_[0]))
-
-    except Exception as e:
-        st.error(f"Error durante la predicción: {e}")
-        st.error("Verifica que tu lógica de pre-procesamiento (scaler/encoder) en `streamlit_app.py` sea idéntica a la de tu notebook.")
-
-
-# --- SECCIÓN DE ANÁLISIS EXPLORATORIO (GRÁFICOS) ---
-# Aquí es donde integramos los gráficos de tu notebook.
-st.header("Análisis Exploratorio del Proyecto", divider='rainbow')
-st.markdown("""
-Aquí puedes mostrar los gráficos de Matplotlib/Seaborn de tu notebook 
-para dar contexto a los resultados de la predicción.
-""")
-
-# --- Cargador de datos para análisis ---
+# --- Función de Carga de Datos ---
 @st.cache_data
-def cargar_datos_analisis(archivo_csv):
-    """Carga el CSV para los gráficos de análisis."""
-    df = pd.read_csv(archivo_csv)
-    return df
+def load_data(file):
+    """Carga datos desde un archivo CSV o Excel."""
+    try:
+        if file.name.endswith('.csv'):
+            df = pd.read_csv(file)
+        elif file.name.endswith('.xlsx'):
+            df = pd.read_excel(file, engine='openpyxl')
+        else:
+            st.error("Formato de archivo no soportado. Por favor, sube un CSV o XLSX.")
+            return None
+        return df
+    except Exception as e:
+        st.error(f"Error al leer el archivo: {e}")
+        return None
 
-# --- Gráfico de Ejemplo 1 ---
-st.subheader("Gráfico de Ejemplo: Distribución de Edad")
-st.markdown("Pega aquí el código de tus gráficos del notebook.")
+# --- Barra Lateral (Sidebar) ---
+st.sidebar.header("Configuración del Dashboard")
 
-# Debes subir tu archivo CSV de análisis al repositorio de GitHub
-# y poner el nombre aquí.
-nombre_archivo_csv = 'datos_analisis_metrosalud.csv' # <-- CAMBIA ESTO
+# 1. Carga de Archivo
+uploaded_file = st.sidebar.file_uploader(
+    "Sube tu archivo (CSV o XLSX)", 
+    type=["csv", "xlsx"]
+)
 
-try:
-    df_analisis = cargar_datos_analisis(nombre_archivo_csv)
+if uploaded_file:
+    # Si se sube un nuevo archivo, actualiza el estado de sesión
+    if uploaded_file.name != st.session_state.df_name:
+        st.session_state.df = load_data(uploaded_file)
+        st.session_state.df_name = uploaded_file.name
+        st.sidebar.success(f"¡Archivo '{uploaded_file.name}' cargado!")
+
+# --- Cuerpo Principal del Dashboard ---
+st.title("🚀 Constructor de Dashboards Interactivo")
+st.markdown("Sube tus datos y crea tus propios tableros de análisis al instante.")
+
+if st.session_state.df is None:
+    st.info("Por favor, sube un archivo CSV o XLSX para comenzar.")
+else:
+    # Si hay datos cargados, mostramos los tableros
+    df = st.session_state.df
+
+    # 2. Filtros Globales (en la barra lateral)
+    st.sidebar.header("Filtros Globales")
     
-    # --- Pega tu código de gráfico aquí ---
-    # Ejemplo (debes reemplazar 'col_edad' por tu columna real)
-    fig, ax = plt.subplots()
-    if 'col_edad' in df_analisis.columns:
-        sns.histplot(df_analisis['col_edad'], kde=True, ax=ax, bins=20)
-        ax.set_title('Distribución de Edad de Pacientes')
-        ax.set_xlabel('Edad (meses)')
-        ax.set_ylabel('Frecuencia')
-        st.pyplot(fig) # <-- Este comando "integra" el gráfico en Streamlit
-    else:
-        st.warning(f"La columna 'col_edad' no se encontró en {nombre_archivo_csv}. Mostrando datos del CSV:")
-        st.dataframe(df_analisis.head())
+    # Identificar columnas categóricas y numéricas
+    categorical_cols = df.select_dtypes(include=['object', 'category']).columns.tolist()
+    numerical_cols = df.select_dtypes(include=np.number).columns.tolist()
 
-    # --- Puedes añadir más gráficos ---
-    # st.subheader("Gráfico 2: ...")
-    # fig2, ax2 = plt.subplots()
-    # ... (tu código de seaborn/matplotlib) ...
-    # st.pyplot(fig2)
+    # Crear filtros para columnas categóricas
+    global_filters = {}
+    for col in categorical_cols:
+        if df[col].nunique() < 50: # Solo crear filtros para columnas con < 50 valores únicos
+            options = df[col].unique().tolist()
+            selected = st.sidebar.multiselect(f"Filtrar por {col}", options, default=options)
+            global_filters[col] = selected
 
+    # Aplicar filtros
+    df_filtered = df.copy()
+    for col, selected_values in global_filters.items():
+        df_filtered = df_filtered[df_filtered[col].isin(selected_values)]
 
-except FileNotFoundError:
-    st.error(f"Error: No se encontró el archivo de datos '{nombre_archivo_csv}'.")
-    st.error(f"Por favor, sube tu archivo CSV de análisis a tu repositorio de GitHub para que los gráficos funcionen.")
-except Exception as e:
-    st.error(f"Error al cargar o graficar los datos: {e}")
+    # --- Creación de Tabs para los Dashboards ---
+    tab_informativo, tab_operativo, tab_analitico, tab_estrategico = st.tabs(
+        ["📄 Informativo", "📈 Operativo (KPIs)", "📊 Analítico", "♟️ Estratégico"]
+    )
+
+    # --- Tab 1: Informativo (Datos Crudos y Resumen) ---
+    with tab_informativo:
+        st.header("Tablero Informativo: Vista de Datos")
+        st.subheader(f"Datos de: {st.session_state.df_name} (Filtrados)")
+        st.dataframe(df_filtered)
+        
+        st.subheader("Resumen Estadístico (Datos Numéricos)")
+        if numerical_cols:
+            st.dataframe(df_filtered[numerical_cols].describe())
+        else:
+            st.info("No se encontraron columnas numéricas para el resumen.")
+
+    # --- Tab 2: Operativo (KPIs) ---
+    with tab_operativo:
+        st.header("Tablero Operativo: Métricas Clave (KPIs)")
+        st.markdown("Selecciona una columna numérica para ver sus KPIs.")
+        
+        if not numerical_cols:
+            st.warning("No hay columnas numéricas para calcular KPIs.")
+        else:
+            kpi_col = st.selectbox("Selecciona una métrica para KPIs", numerical_cols, index=0)
+            
+            # Calcular KPIs
+            total_sum = df_filtered[kpi_col].sum()
+            average = df_filtered[kpi_col].mean()
+            max_val = df_filtered[kpi_col].max()
+            min_val = df_filtered[kpi_col].min()
+            count = df_filtered[kpi_col].count()
+            
+            # Mostrar KPIs en columnas
+            col1, col2, col3 = st.columns(3)
+            col1.metric("Suma Total", f"{total_sum:,.2f}")
+            col2.metric("Promedio", f"{average:,.2f}")
+            col3.metric("Conteo de Registros", f"{count:,}")
+            
+            col4, col5 = st.columns(2)
+            col4.metric("Valor Máximo", f"{max_val:,.2f}")
+            col5.metric("Valor Mínimo", f"{min_val:,.2f}")
+
+    # --- Tab 3: Analítico (Distribuciones y Relaciones) ---
+    with tab_analitico:
+        st.header("Tablero Analítico: Exploración Visual")
+        
+        if not numerical_cols:
+            st.warning("Se necesitan columnas numéricas para estos gráficos.")
+        else:
+            # Gráfico de Distribución (Histograma)
+            st.subheader("Análisis de Distribución")
+            hist_col = st.selectbox("Columna para Histograma", numerical_cols, index=0)
+            fig_hist = px.histogram(df_filtered, x=hist_col, title=f"Distribución de {hist_col}", nbins=50)
+            st.plotly_chart(fig_hist, use_container_width=True)
+            
+            # Gráfico de Dispersión (Relación)
+            st.subheader("Análisis de Relación (Gráfico de Dispersión)")
+            if len(numerical_cols) >= 2:
+                col_x = st.selectbox("Selecciona Eje X", numerical_cols, index=0)
+                col_y = st.selectbox("Selecciona Eje Y", numerical_cols, index=1)
+                color_col = st.selectbox("Selecciona Columna para Color (Opcional)", [None] + categorical_cols)
+                
+                fig_scatter = px.scatter(df_filtered, x=col_x, y=col_y, color=color_col,
+                                         title=f"Relación entre {col_x} y {col_y}")
+                st.plotly_chart(fig_scatter, use_container_width=True)
+            else:
+                st.info("Se necesitan al menos dos columnas numéricas para un gráfico de dispersión.")
+
+    # --- Tab 4: Estratégico (Agregaciones) ---
+    with tab_estrategico:
+        st.header("Tablero Estratégico: Análisis Agregado")
+        st.markdown("Agrupa tus datos para ver tendencias de alto nivel.")
+        
+        if not categorical_cols or not numerical_cols:
+            st.warning("Se necesita al menos una columna categórica y una numérica para este análisis.")
+        else:
+            group_col = st.selectbox("Agrupar por (Dimensión)", categorical_cols, index=0)
+            metric_col = st.selectbox("Calcular (Métrica)", numerical_cols, index=0)
+            agg_func = st.selectbox("Función de Agregación", ["sum", "mean", "count"])
+            
+            # Realizar la agregación
+            try:
+                if agg_func == 'sum':
+                    df_agg = df_filtered.groupby(group_col)[metric_col].sum().reset_index()
+                elif agg_func == 'mean':
+                    df_agg = df_filtered.groupby(group_col)[metric_col].mean().reset_index()
+                elif agg_func == 'count':
+                    df_agg = df_filtered.groupby(group_col)[metric_col].count().reset_index()
+                
+                # Graficar resultado
+                fig_bar = px.bar(df_agg, x=group_col, y=metric_col, 
+                                 title=f"{agg_func.capitalize()} de {metric_col} por {group_col}",
+                                 color=group_col)
+                st.plotly_chart(fig_bar, use_container_width=True)
+                
+                st.subheader("Datos Agregados")
+                st.dataframe(df_agg)
+                
+            except Exception as e:
+                st.error(f"Error al agregar datos: {e}")
