@@ -1,225 +1,210 @@
 import streamlit as st
 import pandas as pd
-import plotly.express as px
-from sklearn.ensemble import RandomForestRegressor
-from sklearn.impute import SimpleImputer
-from sklearn.preprocessing import LabelEncoder
-import io
+import numpy as np
+import tensorflow as tf
+import joblib
+from tensorflow.keras.models import load_model
+import matplotlib.pyplot as plt  # <-- Importe agregado
+import seaborn as sns            # <-- Importe agregado
 
 # --- Configuración de la Página ---
-# Usamos layout="wide" para que el dashboard ocupe toda la pantalla
-st.set_page_config(layout="wide", page_title="Analizador Estratégico de Datos")
+st.set_page_config(
+    page_title="Predicciones Metrosalud",
+    page_icon="🏥",
+    layout="wide"
+)
 
-# --- Funciones de Carga y Procesamiento ---
-
-# Usamos @st.cache_data para que streamlit guarde en caché el archivo cargado.
-# Si el usuario interactúa con un widget, el archivo no se vuelve a cargar,
-# haciendo la app mucho más rápida.
-@st.cache_data
-def load_data(file, sample_rows=None):
-    """Carga datos desde un archivo CSV o XLSX, con opción de muestreo."""
-    try:
-        if file.name.endswith('.csv'):
-            df = pd.read_csv(file, nrows=sample_rows)
-        elif file.name.endswith(('.xls', '.xlsx')):
-            # 'openpyxl' es necesario para leer .xlsx
-            df = pd.read_excel(file, engine='openpyxl', nrows=sample_rows)
-        else:
-            st.error("Formato de archivo no soportado. Use .csv o .xlsx")
-            return None
-        
-        # Convertir nombres de columnas a string (para evitar errores)
-        df.columns = df.columns.astype(str)
-        return df
-    except Exception as e:
-        st.error(f"Error al cargar el archivo: {e}")
-        return None
-
-@st.cache_data
-def calculate_feature_importance(df, target_variable):
-    """Calcula la importancia de variables usando RandomForest."""
-    
-    # 1. Crear una copia para no modificar el original en caché
-    df_processed = df.copy()
-
-    # 2. Separar X (features) e y (target)
-    if target_variable not in df_processed.columns:
-        st.error("La variable objetivo seleccionada no se encuentra.")
-        return None
-        
-    y = df_processed[target_variable]
-    X = df_processed.drop(columns=[target_variable])
-
-    # 3. Preprocesamiento simple
-    imputer_num = SimpleImputer(strategy='median')
-    imputer_cat = SimpleImputer(strategy='most_frequent')
-    le = LabelEncoder()
-
-    numeric_cols = X.select_dtypes(include=['number']).columns
-    categorical_cols = X.select_dtypes(exclude=['number']).columns
-
-    # Imputar y codificar
-    if not numeric_cols.empty:
-        X[numeric_cols] = imputer_num.fit_transform(X[numeric_cols])
-        
-    for col in categorical_cols:
-        X[col] = imputer_cat.fit_transform(X[[col]])
-        X[col] = le.fit_transform(X[col])
-
-    # 4. Entrenar modelo (solo si 'y' es numérica)
-    if pd.api.types.is_numeric_dtype(y):
-        model = RandomForestRegressor(n_estimators=100, random_state=42, n_jobs=-1)
-        model.fit(X, y)
-        
-        # 5. Obtener importancia
-        importance = pd.Series(model.feature_importances_, index=X.columns)
-        return importance.sort_values(ascending=False)
-    else:
-        st.warning("La variable objetivo debe ser numérica para calcular la importancia (Regresión).")
-        return None
-
-# --- Layout de la Aplicación ---
-
-st.title("📊 Tablero de Control Estratégico")
-st.write("Cargue su archivo .csv o .xlsx para analizar los datos y la importancia de las variables.")
-
-# --- Barra Lateral (Sidebar) ---
-st.sidebar.header("1. Carga de Datos")
-uploaded_file = st.sidebar.file_uploader("Seleccione un archivo", type=["csv", "xlsx"])
-
-sample_check = st.sidebar.checkbox("Analizar solo las primeras 50,000 filas")
-sample_size = 50000 if sample_check else None
-
-st.sidebar.markdown("""
-**Nota sobre Archivos Pesados:**
-* Los archivos grandes pueden tardar en procesarse.
-* Streamlit Community Cloud tiene RAM limitada. Si su app falla, use la opción de **muestreo**.
+# --- Título y Descripción ---
+st.title("🏥 Proyecto Metrosalud - Primera Infancia")
+st.markdown("""
+Esta aplicación utiliza un modelo de Red Neuronal (IA) entrenado para 
+predecir... *(Aquí debes completar el objetivo de tu modelo, ej: 'el riesgo de desnutrición', 'el estado de vacunación', etc.)*
 """)
 
-# --- Cuerpo Principal del Dashboard ---
-if uploaded_file is not None:
-    df = load_data(uploaded_file, sample_size)
+# --- Carga de Modelos y Pre-procesadores ---
+# Usamos @st.cache_resource para cargar los modelos solo una vez
 
-    if df is not None:
-        st.success(f"¡Archivo cargado exitosamente! Se muestran {len(df)} filas.")
-        
-        # Crear pestañas para el dashboard
-        tab1, tab2, tab3, tab4 = st.tabs([
-            "Resumen General", 
-            "Análisis de Variables", 
-            "Matriz de Correlación", 
-            "Importancia Estratégica"
-        ])
+@st.cache_resource
+def cargar_modelo():
+    """Carga el modelo de Keras y los pre-procesadores."""
+    try:
+        modelo = load_model('modelo_primera_infancia.h5')
+        scaler = joblib.load('scaler_X.pkl')
+        encoder = joblib.load('encoder_y.pkl')
+        return modelo, scaler, encoder
+    except FileNotFoundError:
+        st.error("Error Crítico: Faltan los archivos del modelo ('modelo_primera_infancia.h5' o 'scaler_X.pkl').")
+        st.error("Asegúrate de haber subido los archivos .h5 y .pkl a tu repositorio de GitHub.")
+        return None, None, None
+    except Exception as e:
+        st.error(f"Error al cargar los modelos: {e}")
+        return None, None, None
 
-        # --- Pestaña 1: Resumen General ---
-        with tab1:
-            st.header("Resumen General del Conjunto de Datos")
-            
-            # Mostrar un 'head' del dataframe
-            st.subheader("Vista Previa de los Datos")
-            st.dataframe(df.head())
+modelo, scaler, encoder = cargar_modelo()
 
-            col1, col2 = st.columns(2)
-            
-            with col1:
-                # Estadísticas Descriptivas
-                st.subheader("Estadísticas Descriptivas")
-                st.dataframe(df.describe(include='all').T)
+# --- Barra Lateral de Interacción (Inputs del Usuario) ---
+st.sidebar.header("Ingresar Datos del Paciente")
 
-            with col2:
-                # Información de Tipos de Datos y Nulos
-                st.subheader("Tipos de Datos y Valores Faltantes")
-                # Capturamos la salida de df.info() en un buffer de texto
-                buffer = io.StringIO()
-                df.info(buf=buffer)
-                s = buffer.getvalue()
-                st.text(s)
-
-        # --- Pestaña 2: Análisis de Variables ---
-        with tab2:
-            st.header("Análisis Univariable y Bivariable")
-            st.write("Seleccione variables para explorar su distribución y relación.")
-
-            col1, col2 = st.columns(2)
-            
-            with col1:
-                # Selección de variable para Histograma
-                st.subheader("Distribución (Histograma)")
-                var_hist = st.selectbox("Seleccione una variable numérica", 
-                                        options=df.select_dtypes(include=['number']).columns, 
-                                        key='hist')
-                if var_hist:
-                    fig_hist = px.histogram(df, x=var_hist, nbins=50, title=f"Distribución de {var_hist}")
-                    st.plotly_chart(fig_hist, use_container_width=True)
-
-            with col2:
-                # Selección de variables para Scatter plot
-                st.subheader("Relación (Scatter Plot)")
-                var_scatter_x = st.selectbox("Seleccione variable Eje X", 
-                                             options=df.columns, 
-                                             key='scatter_x')
-                var_scatter_y = st.selectbox("Seleccione variable Eje Y", 
-                                             options=df.columns, 
-                                             key='scatter_y')
-                if var_scatter_x and var_scatter_y:
-                    fig_scatter = px.scatter(df.sample(min(1000, len(df))), # Usamos muestra para no sobrecargar
-                                             x=var_scatter_x, 
-                                             y=var_scatter_y, 
-                                             title=f"Relación entre {var_scatter_x} y {var_scatter_y}")
-                    st.plotly_chart(fig_scatter, use_container_width=True)
-
-        # --- Pestaña 3: Matriz de Correlación ---
-        with tab3:
-            st.header("Matriz de Correlación")
-            st.write("Muestra la correlación lineal (Pearson) entre las variables **numéricas**.")
-            
-            try:
-                corr_matrix = df.corr(numeric_only=True)
-                fig_corr = px.imshow(corr_matrix, 
-                                     text_auto=True, 
-                                     aspect="auto",
-                                     title="Matriz de Correlación")
-                st.plotly_chart(fig_corr, use_container_width=True)
-            except Exception as e:
-                st.warning(f"No se pudo calcular la matriz de correlación. Error: {e}")
-
-        # --- Pestaña 4: Importancia Estratégica ---
-        with tab4:
-            st.header("Importancia de Variables (Feature Importance)")
-            st.info("""
-            Esta sección utiliza un modelo de Machine Learning (Random Forest) para determinar 
-            qué variables influyen más en una **variable objetivo**.
-            
-            **Debe seleccionar una variable objetivo NUMÉRICA (ej. 'Ventas', 'Costos', 'Puntaje').**
-            """)
-
-            # Selección de la variable objetivo
-            numeric_cols = df.select_dtypes(include=['number']).columns
-            if not numeric_cols.empty:
-                target_var = st.selectbox("Seleccione su variable objetivo (Y)", options=numeric_cols)
-
-                if st.button(f"Calcular Importancia para '{target_var}'"):
-                    with st.spinner("Entrenando modelo y calculando..."):
-                        importance_series = calculate_feature_importance(df, target_var)
-                        
-                        if importance_series is not None:
-                            # Crear un DataFrame para Plotly
-                            importance_df = pd.DataFrame({
-                                'Variable': importance_series.index,
-                                'Importancia': importance_series.values
-                            })
-                            
-                            # Graficar
-                            fig_imp = px.bar(importance_df.sort_values(by='Importancia', ascending=True), 
-                                             x='Importancia', 
-                                             y='Variable', 
-                                             orientation='h',
-                                             title=f"Variables más importantes que influyen en '{target_var}'")
-                            st.plotly_chart(fig_imp, use_container_width=True)
-                        else:
-                            st.error("No se pudo calcular la importancia. Asegúrese de que la variable objetivo sea numérica.")
-            else:
-                st.warning("No se encontraron variables numéricas para seleccionar como objetivo.")
-
+if modelo is None:
+    st.sidebar.error("La app no puede funcionar sin los archivos del modelo.")
 else:
-    st.info("Esperando a que se cargue un archivo .csv o .xlsx...")
+    # --- Formulario de Inputs ---
+    # !!! IMPORTANTE: REEMPLAZA ESTO CON TUS VERDADERAS CARACTERÍSTICAS (FEATURES) !!!
+    # El orden y tipo de dato debe ser EXACTAMENTE el mismo que usaste para entrenar.
+    
+    st.sidebar.write("Debes reemplazar estos campos de ejemplo:")
+    
+    # Ejemplo Característica 1 (Numérica)
+    edad_meses = st.sidebar.slider("Edad (meses)", min_value=0, max_value=60, value=24, help="Edad del infante en meses.")
+    
+    # Ejemplo Característica 2 (Numérica)
+    peso_kg = st.sidebar.number_input("Peso (kg)", min_value=1.0, max_value=25.0, value=10.0, step=0.1)
+    
+    # Ejemplo Característica 3 (Categórica)
+    vacunas = st.sidebar.selectbox("Esquema de Vacunación", ['Completo', 'Incompleto', 'No Aplica'])
+    
+    # Ejemplo Característica 4 (Numérica)
+    talla_cm = st.sidebar.number_input("Talla (cm)", min_value=40.0, max_value=120.0, value=75.0)
+    
+    # Botón para predecir
+    submit_button = st.sidebar.button("Realizar Predicción", type="primary")
+
+# --- Lógica de Predicción ---
+if submit_button and modelo is not None:
+    st.header("Resultado de la Predicción", divider='rainbow')
+    
+    try:
+        # 1. Crear el DataFrame de entrada para el pre-procesamiento
+        # Debe tener los MISMOS NOMBRES DE COLUMNAS que tu X_train original
+        
+        # !!! REEMPLAZA ESTO !!!
+        # Crea un diccionario con los nombres de columna correctos
+        input_data_dict = {
+            'col_edad': [edad_meses],
+            'col_peso': [peso_kg],
+            'col_vacunas': [vacunas],
+            'col_talla': [talla_cm]
+            # ... añade todas tus columnas ...
+        }
+        
+        input_df = pd.DataFrame(input_data_dict)
+        st.write("Datos de entrada (pre-procesamiento):")
+        st.dataframe(input_df)
+
+        # 2. Pre-procesar los datos
+        # Esta es la razón por la que DEBES guardar tu scaler.
+        # Asumiendo que usaste un ColumnTransformer o un pipeline.
+        # Si escalaste todo, sería algo como:
+        
+        # --- (INICIO) Ejemplo de Pre-procesamiento ---
+        # Esto es muy específico de tu notebook, debes adaptarlo.
+        # Supongamos que 'col_edad', 'col_peso', 'col_talla' eran numéricas
+        # y 'col_vacunas' era categórica.
+        
+        # Separar columnas numéricas y categóricas (ejemplo)
+        # Esto es solo un EJEMPLO. Debes usar tu lógica de scaler/encoder
+        
+        # Aplicar el scaler a los datos numéricos de entrada
+        # Asumiendo que el scaler se ajustó a ['col_edad', 'col_peso', 'col_talla']
+        # datos_numericos = input_df[['col_edad', 'col_peso', 'col_talla']]
+        # datos_numericos_scaled = scaler.transform(datos_numericos)
+        
+        # Aplicar el encoder a los datos categóricos de entrada
+        # (Si usaste One-Hot, es más complejo y es mejor usar un Pipeline)
+        # (Por simplicidad, asumiremos que tu scaler los procesa todos o que
+        # tu modelo puede manejar diferentes tipos, lo cual es raro)
+        
+        # *** Simulación de escalado simple ***
+        # Es más probable que tu scaler espere un array de todas las features
+        # en un orden específico.
+        
+        # Ejemplo:
+        # 1. Convertir 'vacunas' a número (ej. LabelEncoding manual)
+        # input_df['col_vacunas'] = input_df['col_vacunas'].map({'Completo': 2, 'Incompleto': 1, 'No Aplica': 0})
+        
+        # 2. Crear el array de numpy en el orden correcto
+        # features_para_scaler = input_df[['col_edad', 'col_peso', 'col_talla', 'col_vacunas']].values
+        
+        # 3. Aplicar scaler
+        # features_scaled = scaler.transform(features_para_scaler)
+        
+        # --- (FIN) Ejemplo de Pre-procesamiento ---
+
+        # DADO QUE NO PUEDO SABER TU PRE-PROCESAMIENTO, USARÉ UN SIMULADOR
+        # ¡¡¡ DEBES REEMPLAZAR ESTA LÍNEA !!!
+        features_scaled = np.random.rand(1, modelo.input_shape[1])
+        st.warning("Advertencia: Usando datos de predicción simulados. Debes conectar tu lógica de pre-procesamiento (scaler/encoder) aquí.")
+        
+
+        # 3. Realizar la predicción
+        prediccion_prob = modelo.predict(features_scaled)
+        
+        # 4. Interpretar el resultado
+        # Si es clasificación multiclase (softmax), obtén la clase con mayor prob.
+        clase_predicha_idx = np.argmax(prediccion_prob, axis=1)[0]
+        
+        # Usar el encoder de 'y' para obtener la etiqueta original
+        # Asumiendo que 'encoder' es el encoder de 'y' (la variable objetivo)
+        etiqueta_predicha = encoder.categories_[0][clase_predicha_idx]
+
+        st.success(f"**Predicción del Modelo:** {etiqueta_predicha}")
+        
+        st.write("Probabilidades (debug):")
+        st.dataframe(pd.DataFrame(prediccion_prob, columns=encoder.categories_[0]))
+
+    except Exception as e:
+        st.error(f"Error durante la predicción: {e}")
+        st.error("Verifica que tu lógica de pre-procesamiento (scaler/encoder) en `streamlit_app.py` sea idéntica a la de tu notebook.")
+
+
+# --- SECCIÓN DE ANÁLISIS EXPLORATORIO (GRÁFICOS) ---
+# Aquí es donde integramos los gráficos de tu notebook.
+st.header("Análisis Exploratorio del Proyecto", divider='rainbow')
+st.markdown("""
+Aquí puedes mostrar los gráficos de Matplotlib/Seaborn de tu notebook 
+para dar contexto a los resultados de la predicción.
+""")
+
+# --- Cargador de datos para análisis ---
+@st.cache_data
+def cargar_datos_analisis(archivo_csv):
+    """Carga el CSV para los gráficos de análisis."""
+    df = pd.read_csv(archivo_csv)
+    return df
+
+# --- Gráfico de Ejemplo 1 ---
+st.subheader("Gráfico de Ejemplo: Distribución de Edad")
+st.markdown("Pega aquí el código de tus gráficos del notebook.")
+
+# Debes subir tu archivo CSV de análisis al repositorio de GitHub
+# y poner el nombre aquí.
+nombre_archivo_csv = 'datos_analisis_metrosalud.csv' # <-- CAMBIA ESTO
+
+try:
+    df_analisis = cargar_datos_analisis(nombre_archivo_csv)
+    
+    # --- Pega tu código de gráfico aquí ---
+    # Ejemplo (debes reemplazar 'col_edad' por tu columna real)
+    fig, ax = plt.subplots()
+    if 'col_edad' in df_analisis.columns:
+        sns.histplot(df_analisis['col_edad'], kde=True, ax=ax, bins=20)
+        ax.set_title('Distribución de Edad de Pacientes')
+        ax.set_xlabel('Edad (meses)')
+        ax.set_ylabel('Frecuencia')
+        st.pyplot(fig) # <-- Este comando "integra" el gráfico en Streamlit
+    else:
+        st.warning(f"La columna 'col_edad' no se encontró en {nombre_archivo_csv}. Mostrando datos del CSV:")
+        st.dataframe(df_analisis.head())
+
+    # --- Puedes añadir más gráficos ---
+    # st.subheader("Gráfico 2: ...")
+    # fig2, ax2 = plt.subplots()
+    # ... (tu código de seaborn/matplotlib) ...
+    # st.pyplot(fig2)
+
+
+except FileNotFoundError:
+    st.error(f"Error: No se encontró el archivo de datos '{nombre_archivo_csv}'.")
+    st.error(f"Por favor, sube tu archivo CSV de análisis a tu repositorio de GitHub para que los gráficos funcionen.")
+except Exception as e:
+    st.error(f"Error al cargar o graficar los datos: {e}")
