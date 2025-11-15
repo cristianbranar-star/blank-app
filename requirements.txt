@@ -3,3 +3,9 @@ pandas
 openpyxl
 plotly
 scikit-learn
+numpy
+scikit-learn
+tensorflow
+joblib
+matplotlib
+seaborn
